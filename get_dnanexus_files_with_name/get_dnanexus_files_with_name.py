@@ -29,7 +29,7 @@ def get_args():
 		epilog="Developed by Genome Analysis Unit: McIntosh, Carl.")
 
 	#### Optional Parameters
-	parser.add_argument("-v","--version", action='version', version='%(prog)s version: July 2021')
+	parser.add_argument("-v","--version", action='version', version='%(prog)s version: July 2024')
 
 	#### Required
 	group_req = parser.add_argument_group('required arguments')
