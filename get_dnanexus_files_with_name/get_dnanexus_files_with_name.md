@@ -36,15 +36,15 @@ python3 get_dnanexus_files_with_name.py \
 
 ```
 
-## Backlist option, all downloaded and all added to blacklist
-***--use_blacklist*** : Files for a give set of *file-id* will not be downloaded, but all others, will be downloaded and added to the blacklist file. This will ensure that the file will be downloaded once. Downloaded files will be pre-appended with the *file-id*, so, if the *file-id* is "file-XXXXXX"
+## Backlist option, all downloaded and all added to excludelist
+***--use_exclude_file*** : Files for a give set of *file-id* will not be downloaded, but all others, will be downloaded and added to the excludelist file. This will ensure that the file will be downloaded once. Downloaded files will be pre-appended with the *file-id*, so, if the *file-id* is "file-XXXXXX"
  and the filename was "file.txt" then the downloaded file name will be file-XXXXXX_file.txt. This ensures that the files are uniquely named.
 
 ```BASH
 python3 get_dnanexus_files_with_name.py \
 --project_name $DNANEXUS_PROJECT  \
 --file_name $FILE_NAME \
---use_blacklist $BLACKLIST_FILE_PATH
+--use_exclude_file $EXCLUDE_FILE_PATH
 ```
 
 ## Script will explore all accessible *DNAnexus* projects.

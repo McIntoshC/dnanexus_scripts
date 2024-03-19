@@ -38,7 +38,7 @@ def get_args():
 	#### Limit Downloads
 	group_limit_files = parser.add_argument_group('limit downloads')
 	group_limit_files.add_argument('--no_downloads', help="List files without downloading.", action='store_true')
-	group_limit_files.add_argument('--use_blacklist', help="Use file with list of file-ids to exclude from downloading.", required=False)
+	group_limit_files.add_argument('--use_exclude_file', help="Use file with list of file-ids to exclude from downloading.", required=False)
 
 	#### Limit Projects
 	group_limit_projs = parser.add_argument_group('limit projects')
@@ -52,8 +52,8 @@ def project_name(project_id):
 	project_info = json.loads(project_info)
 	return project_info['name']
 
-def append_blacklist(blacklist, file_id):
-	with open(blacklist,'a') as FILE:
+def append_exclude_list(excludelist, file_id):
+	with open(excludelist,'a') as FILE:
 		FILE.writelines([file_id + '\n'])
 
 
@@ -62,7 +62,7 @@ def main():
 	"""*main* - main function.
 
 	"""
-	blacklist = None
+	excludelist = None
 
 	######## Parse arguments ########
 	args = get_args()
@@ -79,19 +79,19 @@ def main():
 	print("--------------------------------------------------------------------------------")
 
 
-	if (args.use_blacklist):
-		print ("Loading blacklist : \n\t" + args.use_blacklist)
+	if (args.use_exclude_file):
+		print ("Loading excludelist : \n\t" + args.use_exclude_file)
 
 		try:
-			with open(args.use_blacklist, 'r') as FILE:
-				blacklist = FILE.read().split("\n")
-				blacklist.remove("")
-				blacklist_count=len(blacklist)
-				print("\tBlacklist contains file count " + str(blacklist_count)+ "\n")
+			with open(args.use_exclude_file, 'r') as FILE:
+				excludelist = FILE.read().split("\n")
+				excludelist.remove("")
+				excludelist_count=len(excludelist)
+				print("\tExcludelist contains file count " + str(excludelist_count)+ "\n")
 				print("--------------------------------------------------------------------------------")
 
 		except:
-			print("\tERROR: File could not be found: \n\t\t" + args.use_blacklist)
+			print("\tERROR: File could not be found: \n\t\t" + args.use_exclude_file)
 			print("\tCheck location of file and try again. Program will exit now.")
 			sys.exit()
 
@@ -99,21 +99,21 @@ def main():
 		file_dict = dict(files_array[idx])
 		proj_name = project_name(file_dict["project"])
 		isDownload = False
-		isFoundInBlacklist = False
+		isFoundInExcludelist = False
 
 		if not args.no_downloads:
-			# We are using a blacklist and it is in blacklist, then we will NOT download the file.
-			if (args.use_blacklist and file_dict["id"] in blacklist):
+			# We are using a excludelist and it is in excludelist, then we will NOT download the file.
+			if (args.use_exclude_file and file_dict["id"] in excludelist):
 				isDownload = False
-				isFoundInBlacklist = True
-			# We are using a blacklist AND it is not in blacklist, then we will download the file.
-			elif (args.use_blacklist and file_dict["id"] not in blacklist):
+				isFoundInExcludelist = True
+			# We are using a excludelist AND it is not in excludelist, then we will download the file.
+			elif (args.use_exclude_file and file_dict["id"] not in excludelist):
 				isDownload = True
 				# add to backlist
-				append_blacklist(args.use_blacklist, file_dict["id"])
+				append_exclude_list(args.use_exclude_file, file_dict["id"])
 				## Add to file
 
-			# We are not using the a blacklist, so we will download the file.
+			# We are not using the a excludelist, so we will download the file.
 			else:
 				isDownload = True
 		else:
@@ -125,11 +125,11 @@ def main():
 			file_id_str = file_dict["id"].replace('-','_')
 			subprocess.run(["dx", "download", "--no-progress", "--output", file_id_str + "_" + args.file_name, file_dict["id"]])
 
-			blacklist.append(file_dict["id"])
+			excludelist.append(file_dict["id"])
 		else:
 			print("Not downloading " + file_dict["id"] + " from location: ")
 			print("\t" + proj_name + ":" + file_dict["describe"]["folder"] + "/")
-			if isFoundInBlacklist: print("\t## This File Found in Blacklist ##\n")
+			if isFoundInExcludelist: print("\t## This File Found in Excludelist ##\n")
 
 	print("--------------------------------------------------------------------------------")
 	print("################################################################################")
