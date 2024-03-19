@@ -166,5 +166,5 @@ job-xxxx_email.txt
 job-yyyy_email.txt
 exclude.txt
 blacklisted.txt
+..DS_Store
 /TestFiles
-

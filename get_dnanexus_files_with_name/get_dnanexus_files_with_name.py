@@ -8,6 +8,7 @@ import argparse
 import json
 import sys
 
+
 ## Global Variable
 prog_name = "get_dnanexus_files_with_name.py"
 

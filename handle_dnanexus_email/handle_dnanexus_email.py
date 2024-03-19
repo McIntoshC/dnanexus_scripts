@@ -12,6 +12,7 @@ from smtplib import SMTP
 ## Global Variable
 prog_name = "handle_dnanexus_email.py"
 
+##
 
 ## Get program arguments
 # https://docs.python.org/3/library/argparse.html
