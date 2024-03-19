@@ -7,6 +7,7 @@ import dxpy
 import argparse
 import json
 import sys
+from smtplib import SMTP
 
 ## Global Variable
 prog_name = "handle_dnanexus_email.py"
@@ -30,6 +31,7 @@ def get_args():
 
 	#### Optional Parameters
 	parser.add_argument("-v","--version", action='version', version='%(prog)s version: July 2024')
+	parser.add_argument('-e','--send_emails', help="Email letters works when a download occures. (default=false)", default=False, action='store_true')
 
 	#### Required
 	group_req = parser.add_argument_group('required arguments')
@@ -46,6 +48,55 @@ def get_args():
 
 	return parser.parse_args()
 
+def create_email_file_stucture (proj_name):
+	procs = subprocess.run(["dx", "mkdir", "--parents", proj_name + ":/email/pending"], stdout=PIPE)
+	procs = subprocess.run(["dx", "mkdir", "--parents", proj_name + ":/email/sent"], stdout=PIPE)
+
+def send_emails (proj_name, download_path):
+	# Modified from: https://docs.python.org/3/library/smtplib.html
+
+	toAddress = None
+
+
+	with open(download_path, 'r') as EMAIL_FILE:
+		email_file_lines = EMAIL_FILE.readlines()
+		for idx, str_dict in enumerate(email_file_lines):
+			if idx > 1: # Then this is the body of the mail.
+				print ("\t" + email_file_lines[idx])
+			elif idx == 0: # then this is Email To: yyy@gmail.com
+				toAddress = email_file_lines[0].replace("Email To:","")
+				toAddress = toAddress.replace(" ","")
+				toAddress = toAddress.rstrip("\n")
+				toAddress = toAddress.split(',')
+				print ("\tEmail send to addresses: " + str(toAddress))
+			elif idx == 1: # then this is Email To: yyy@gmail.com
+				mySubject = email_file_lines[1].replace("Subject: ","")
+				mySubject = mySubject.rstrip("\n")
+				print ("\tEmail subject: " + mySubject)
+
+# 	fromaddr = prompt("From: ")
+# 	toaddrs  = prompt("To: ").split()
+#
+# 	# Add the From: and To: headers at the start!
+# 	msg = ("From: %s\r\nTo: %s\r\n\r\n"
+# 		   % (fromaddr, ", ".join(toaddrs)))
+# 	while True:
+# 		try:
+# 			line = input()
+# 		except EOFError:
+# 			break
+# 		if not line:
+# 			break
+# 		msg = msg + line
+#
+# 	print("Message length is", len(msg))
+#
+# 	server = smtplib.SMTP('localhost')
+# 	server.set_debuglevel(1)
+# 	server.sendmail(fromaddr, toaddrs, msg)
+# 	server.quit()
+
+
 def project_name(project_id):
 	procs = subprocess.run(["dx", "describe", project_id, "--json"], stdout=PIPE)
 	project_info = procs.stdout.decode("utf-8")
@@ -56,6 +107,10 @@ def append_exclude_list(excludelist, file_id):
 	with open(excludelist,'a') as FILE:
 		FILE.writelines([file_id + '\n'])
 
+def mv_email_on_dnanexus_to_sent (source_email_file_on_dnanexus):
+	print("\t## Moving letter to sent box. ##")
+	dest_email_file_on_dnanexus = source_email_file_on_dnanexus.replace("/pending/", "/sent/")
+	subprocess.run(["dx", "mv", source_email_file_on_dnanexus, dest_email_file_on_dnanexus])
 
 ######## main - start ##############################################################################
 def main():
@@ -71,12 +126,14 @@ def main():
 	print("Program Name:         " + prog_name)
 	print("Searching in Project: " + args.project_name)
 	print("Download Directory:   " + args.output)
+	print("Send emails:          " + str(args.send_emails))
+
 	print("################################################################################")
 	procs = subprocess.run(["dx", "find", "data", "--json","--path", args.project_name + ":/email/pending"], stdout=PIPE)
 	files_json = procs.stdout.decode("utf-8")
 	files_array = json.loads(files_json)
 	file_count = len(files_array)
-	print("INFO: Program found: " + str(file_count) + " emails to be sent.")
+	print("INFO: Program found: " + str(file_count) + " emails to be send.")
 	print("--------------------------------------------------------------------------------")
 
 	if (args.use_exclude_file):
@@ -102,6 +159,11 @@ def main():
 		isFoundInExcludelist = False
 		file_name = file_dict["describe"]["name"]
 
+		if idx < 1: create_email_file_stucture (proj_name)
+
+		download_path = args.output + '/' + file_name
+		download_path = download_path.replace('//','/')
+
 		if not args.no_downloads:
 			# We are using a excludelist and it is in excludelist, then we will NOT download the file.
 			if (args.use_exclude_file and file_dict["id"] in excludelist):
@@ -120,20 +182,24 @@ def main():
 		else:
 			isDownload = False
 
+		email_file_on_dnanexus = proj_name + ":" + file_dict["describe"]["folder"] + "/" + file_name
 		if isDownload:
-			download_path = args.output + '/' + file_name
-			download_path = download_path.replace('//','/')
 			print("Downloading " + file_name + "(" + file_dict["id"] + ")")
-			print("\tFrom Location: " + proj_name + ":" + file_dict["describe"]["folder"] + "/" + file_name)
+			print("\tFrom Location: " + email_file_on_dnanexus)
 			print("\tTo Location  : " + download_path)
 			print("")
-
 			subprocess.run(["dx", "download", "--no-progress", "--output", download_path ,file_dict["id"]])
 			added_file_ids.append(file_dict["id"])
+			mv_email_on_dnanexus_to_sent (email_file_on_dnanexus)
+			if send_emails: send_emails(proj_name, download_path)
+
 		else:
 			print("Not downloading " + file_name + "(" + file_dict["id"] + ")")
-			print("\tFrom Location: " + proj_name + ":" + file_dict["describe"]["folder"] + "/" + file_name)
-			if isFoundInExcludelist: print("\t## This File Found in Exclude List ##\n")
+			print("\tFrom Location: " + email_file_on_dnanexus)
+			if isFoundInExcludelist:
+				print("\t## This File Found in Exclude List ##\n")
+				mv_email_on_dnanexus_to_sent (email_file_on_dnanexus)
+
 
 	print("--------------------------------------------------------------------------------")
 	print("Added file-ids:")
