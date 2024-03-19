@@ -162,9 +162,8 @@ cython_debug/
 # Other files
 run.sh
 .DS_Store
-job-xxxx_email.txt
-job-yyyy_email.txt
-exclude.txt
-blacklisted.txt
 ..DS_Store
+job-xxxx_notice.email.txt
+job-yyyy_notice.email.txt
 /TestFiles
+exclude.txt

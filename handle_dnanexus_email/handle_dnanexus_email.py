@@ -32,7 +32,7 @@ def get_args():
 
 	#### Optional Parameters
 	parser.add_argument("-v","--version", action='version', version='%(prog)s version: July 2024')
-	parser.add_argument('-e','--send_emails', help="Email letters works when a download occures. (default=false)", default=False, action='store_true')
+	parser.add_argument('-e','--send_emails', help="Email letters works when a download occures. (default=None)", default=None)
 
 	#### Required
 	group_req = parser.add_argument_group('required arguments')
@@ -53,49 +53,42 @@ def create_email_file_stucture (proj_name):
 	procs = subprocess.run(["dx", "mkdir", "--parents", proj_name + ":/email/pending"], stdout=PIPE)
 	procs = subprocess.run(["dx", "mkdir", "--parents", proj_name + ":/email/sent"], stdout=PIPE)
 
-def send_emails (proj_name, download_path):
-	# Modified from: https://docs.python.org/3/library/smtplib.html
-
+def send_emails (proj_name, download_path, sendEmail):
+	# https://docs.python.org/3/library/smtplib.html
 	toAddress = None
+	fromAddress = sendEmail.rstrip('\n')
+	body_of_email = ""
 
-
+	print("\tEmail send from: " + fromAddress)
 	with open(download_path, 'r') as EMAIL_FILE:
 		email_file_lines = EMAIL_FILE.readlines()
 		for idx, str_dict in enumerate(email_file_lines):
 			if idx > 1: # Then this is the body of the mail.
-				print ("\t" + email_file_lines[idx])
+				body_of_email += email_file_lines[idx]
 			elif idx == 0: # then this is Email To: yyy@gmail.com
 				toAddress = email_file_lines[0].replace("Email To:","")
 				toAddress = toAddress.replace(" ","")
 				toAddress = toAddress.rstrip("\n")
 				toAddress = toAddress.split(',')
-				print ("\tEmail send to addresses: " + str(toAddress))
+				print("\tEmail send to  : " + str(toAddress))
 			elif idx == 1: # then this is Email To: yyy@gmail.com
 				mySubject = email_file_lines[1].replace("Subject: ","")
 				mySubject = mySubject.rstrip("\n")
 				print ("\tEmail subject: " + mySubject)
 
-# 	fromaddr = prompt("From: ")
-# 	toaddrs  = prompt("To: ").split()
-#
-# 	# Add the From: and To: headers at the start!
-# 	msg = ("From: %s\r\nTo: %s\r\n\r\n"
-# 		   % (fromaddr, ", ".join(toaddrs)))
-# 	while True:
-# 		try:
-# 			line = input()
-# 		except EOFError:
-# 			break
-# 		if not line:
-# 			break
-# 		msg = msg + line
-#
-# 	print("Message length is", len(msg))
-#
-# 	server = smtplib.SMTP('localhost')
-# 	server.set_debuglevel(1)
-# 	server.sendmail(fromaddr, toaddrs, msg)
-# 	server.quit()
+		# Modified from: https://docs.python.org/3/library/smtplib.html
+		msg = ("From: %s\nTo: %s\nSubject: %s\n\n" % (fromAddress, ", ".join(toAddress) ,mySubject))
+		msg = msg + body_of_email
+		print("\tMessage length is", len(msg))
+
+		print("\n\t################################################################################")
+		print("\t" + msg.replace('\n','\n\t'))
+		print("\t################################################################################")
+
+		# server = smtplib.SMTP('localhost')
+		# server.set_debuglevel(1)
+		# server.sendmail(fromAddress, toAddress, msg)
+		# server.quit()
 
 
 def project_name(project_id):
@@ -127,9 +120,10 @@ def main():
 	print("Program Name:         " + prog_name)
 	print("Searching in Project: " + args.project_name)
 	print("Download Directory:   " + args.output)
-	print("Send emails:          " + str(args.send_emails))
-
+	if args.send_emails is not None:
+		print("Send emails:          " + str(args.send_emails))
 	print("################################################################################")
+
 	procs = subprocess.run(["dx", "find", "data", "--json","--path", args.project_name + ":/email/pending"], stdout=PIPE)
 	files_json = procs.stdout.decode("utf-8")
 	files_array = json.loads(files_json)
@@ -192,7 +186,7 @@ def main():
 			subprocess.run(["dx", "download", "--no-progress", "--output", download_path ,file_dict["id"]])
 			added_file_ids.append(file_dict["id"])
 			mv_email_on_dnanexus_to_sent (email_file_on_dnanexus)
-			if send_emails: send_emails(proj_name, download_path)
+			if args.send_emails is not None: send_emails(proj_name, download_path, args.send_emails)
 
 		else:
 			print("Not downloading " + file_name + "(" + file_dict["id"] + ")")
