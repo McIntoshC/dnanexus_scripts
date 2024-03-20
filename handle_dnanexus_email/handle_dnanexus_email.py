@@ -1,13 +1,15 @@
 
-import os
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from subprocess import run, PIPE
-import subprocess
-import time
-import dxpy
 import argparse
+import dxpy
 import json
+import os
+import smtplib
+import subprocess
 import sys
-from smtplib import SMTP
+import time
 
 ## Global Variable
 prog_name = "handle_dnanexus_email.py"
@@ -31,8 +33,8 @@ def get_args():
 		epilog="Developed by Genome Analysis Unit: McIntosh, Carl.")
 
 	#### Optional Parameters
-	parser.add_argument("-v","--version", action='version', version='%(prog)s version: July 2024')
-	parser.add_argument('-e','--send_emails', help="Email letters works when a download occures. (default=None)", default=None)
+	parser.add_argument("-v","--version", action='version', version='%(prog)s version: March 2024')
+	parser.add_argument('-e','--send_emails', help="Add email sender. Works when a download occures. (default=None)", default=None)
 
 	#### Required
 	group_req = parser.add_argument_group('required arguments')
@@ -53,13 +55,38 @@ def create_email_file_stucture (proj_name):
 	procs = subprocess.run(["dx", "mkdir", "--parents", proj_name + ":/email/pending"], stdout=PIPE)
 	procs = subprocess.run(["dx", "mkdir", "--parents", proj_name + ":/email/sent"], stdout=PIPE)
 
-def send_emails (proj_name, download_path, sendEmail):
+def send_individual_email(fromAddress, recipient, mySubject, body_of_email):
+	return_value =  True
+	try:
+		msg = MIMEMultipart()
+		msg['From'] = fromAddress
+		msg['To'] = recipient
+		msg['Subject'] = mySubject
+
+		# mime_txt = MIMEText(unicode(core_member_msg), 'plain')
+		mime_txt = MIMEText(body_of_email.as_string(), 'plain')
+		msg.attach(mime_txt)
+		text = msg.as_string()
+		s = smtplib.SMTP('localhost')
+		s.sendmail(fromAddress, recipient, text)
+		username = recipient.split('@')
+		username = username[0]
+		s.quit()
+		print ('\tSent to recipient: ' + recipient)
+	except:
+		print("\tERROR Failed to sent to: " + recipient)
+		pass
+		return_value =  False
+	return return_value
+
+
+def send_emails (proj_name, download_path, sendEmail, email_file_on_dnanexus):
 	# https://docs.python.org/3/library/smtplib.html
 	toAddress = None
 	fromAddress = sendEmail.rstrip('\n')
 	body_of_email = ""
 
-	print("\tEmail send from: " + fromAddress)
+	# print("\tEmail send from: " + fromAddress)
 	with open(download_path, 'r') as EMAIL_FILE:
 		email_file_lines = EMAIL_FILE.readlines()
 		for idx, str_dict in enumerate(email_file_lines):
@@ -70,26 +97,25 @@ def send_emails (proj_name, download_path, sendEmail):
 				toAddress = toAddress.replace(" ","")
 				toAddress = toAddress.rstrip("\n")
 				toAddress = toAddress.split(',')
-				print("\tEmail send to  : " + str(toAddress))
+				toAddress.append(sendEmail)
 			elif idx == 1: # then this is Email To: yyy@gmail.com
 				mySubject = email_file_lines[1].replace("Subject: ","")
 				mySubject = mySubject.rstrip("\n")
 				print ("\tEmail subject: " + mySubject)
+	body_of_email = MIMEText(body_of_email)
 
-		# Modified from: https://docs.python.org/3/library/smtplib.html
-		msg = ("From: %s\nTo: %s\nSubject: %s\n\n" % (fromAddress, ", ".join(toAddress) ,mySubject))
-		msg = msg + body_of_email
-		print("\tMessage length is", len(msg))
+	## Send individual emails off
+	failed_emails = []
+	for recipient in toAddress:
+		wasSent = send_individual_email(fromAddress, recipient, mySubject, body_of_email)
+		if wasSent == False: failed_emails.append(recipient)
+	failed_count = len(failed_emails)
 
-		print("\n\t################################################################################")
-		print("\t" + msg.replace('\n','\n\t'))
-		print("\t################################################################################")
+	if failed_count > 0:
+		body_of_email = "The following emailing occured for the following email addresses: \n\t" + str(failed_emails)
+		send_individual_email(fromAddress, fromAddress, "ERROR with emailing: " + mySubject, MIMEText(body_of_email))
 
-		# server = smtplib.SMTP('localhost')
-		# server.set_debuglevel(1)
-		# server.sendmail(fromAddress, toAddress, msg)
-		# server.quit()
-
+	mv_email_on_dnanexus_to_sent (email_file_on_dnanexus)
 
 def project_name(project_id):
 	procs = subprocess.run(["dx", "describe", project_id, "--json"], stdout=PIPE)
@@ -185,8 +211,7 @@ def main():
 			print("")
 			subprocess.run(["dx", "download", "--no-progress", "--output", download_path ,file_dict["id"]])
 			added_file_ids.append(file_dict["id"])
-			mv_email_on_dnanexus_to_sent (email_file_on_dnanexus)
-			if args.send_emails is not None: send_emails(proj_name, download_path, args.send_emails)
+			if args.send_emails is not None: send_emails(proj_name, download_path, args.send_emails, email_file_on_dnanexus)
 
 		else:
 			print("Not downloading " + file_name + "(" + file_dict["id"] + ")")

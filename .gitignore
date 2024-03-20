@@ -159,11 +159,15 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Other files
-run.sh
-.DS_Store
-..DS_Store
+# Test email files
 job-xxxx_notice.email.txt
 job-yyyy_notice.email.txt
+job-TEST_notice.email.txt
+
+# Other files
+run.sh
+run_from_helix.sh
+.DS_Store
+..DS_Store
 /TestFiles
 exclude.txt
